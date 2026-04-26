@@ -6,7 +6,7 @@ import com.pasteleria.cakeapi.entities.Torta;
 import com.pasteleria.cakeapi.entities.TamanoTorta;
 import com.pasteleria.cakeapi.entities.Cobertura;
 import com.pasteleria.cakeapi.repositories.TortaRepository;
-import com.pasteleria.cakeapi.repositories.CoberturaRepository; // IMPORTANTE
+import com.pasteleria.cakeapi.repositories.CoberturaRepository;
 import com.pasteleria.cakeapi.service.CloudinaryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -26,7 +26,7 @@ public class TortaController {
     private TortaRepository tortaRepository;
 
     @Autowired
-    private CoberturaRepository coberturaRepository; // NECESITAMOS ESTO PARA BUSCAR LOS IDs
+    private CoberturaRepository coberturaRepository;
 
     @Autowired
     private CloudinaryService cloudinaryService;
@@ -36,21 +36,29 @@ public class TortaController {
         return tortaRepository.findAll();
     }
 
+    @GetMapping("/{id}")
+    public Torta obtenerPorId(@PathVariable Long id) {
+        return tortaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Torta no encontrada con ID: " + id));
+    }
+
     @PostMapping
     public Torta crearTorta(
             @RequestParam("nombre") String nombre,
             @RequestParam("descripcion") String descripcion,
             @RequestParam("categoria") String categoria,
+            @RequestParam(value = "codigoBarrasBase", required = false) String codigoBarrasBase, // AGREGADO
             @RequestParam("tamanosJson") String tamanosJson,
-            @RequestParam(value = "coberturasIds", required = false) String coberturasIdsJson, // AHORA RECIBE IDs
+            @RequestParam(value = "coberturasIds", required = false) String coberturasIdsJson,
             @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
 
         Torta torta = new Torta();
         torta.setNombre(nombre);
         torta.setDescripcion(descripcion);
         torta.setCategoria(categoria);
+        torta.setCodigoBarrasBase(codigoBarrasBase); // ASIGNACIÓN DEL CÓDIGO
 
-        // Subida de imagen
+        // Subida de imagen a Cloudinary
         if (file != null && !file.isEmpty()) {
             try {
                 Map result = cloudinaryService.upload(file);
@@ -64,7 +72,7 @@ public class TortaController {
 
         ObjectMapper mapper = new ObjectMapper();
 
-        // 1. Procesar Tamaños
+        // 1. Procesar Tamaños (JSON String a List)
         try {
             List<TamanoTorta> listaTamanos = mapper.readValue(tamanosJson, new TypeReference<List<TamanoTorta>>() {});
             if (listaTamanos != null) {
@@ -77,12 +85,10 @@ public class TortaController {
             System.err.println("Error al procesar los tamaños: " + e.getMessage());
         }
 
-        // 2. Procesar Coberturas desde los IDs
+        // 2. Procesar Coberturas desde los IDs recibidos
         if (coberturasIdsJson != null && !coberturasIdsJson.isEmpty() && !coberturasIdsJson.equals("[]")) {
             try {
-                // Convertir "[1, 2]" a una lista de Longs
                 List<Long> ids = mapper.readValue(coberturasIdsJson, new TypeReference<List<Long>>() {});
-                // Buscar las coberturas reales en la BD
                 List<Cobertura> coberturasSeleccionadas = coberturaRepository.findAllById(ids);
                 torta.setCoberturas(coberturasSeleccionadas);
             } catch (Exception e) {
@@ -99,8 +105,9 @@ public class TortaController {
             @RequestParam("nombre") String nombre,
             @RequestParam("descripcion") String descripcion,
             @RequestParam("categoria") String categoria,
+            @RequestParam(value = "codigoBarrasBase", required = false) String codigoBarrasBase, // AGREGADO
             @RequestParam("tamanosJson") String tamanosJson,
-            @RequestParam(value = "coberturasIds", required = false) String coberturasIdsJson, // AHORA RECIBE IDs
+            @RequestParam(value = "coberturasIds", required = false) String coberturasIdsJson,
             @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
 
         return tortaRepository.findById(id)
@@ -108,6 +115,7 @@ public class TortaController {
                     torta.setNombre(nombre);
                     torta.setDescripcion(descripcion);
                     torta.setCategoria(categoria);
+                    torta.setCodigoBarrasBase(codigoBarrasBase); // ACTUALIZACIÓN DEL CÓDIGO
 
                     if (file != null && !file.isEmpty()) {
                         try {
@@ -136,7 +144,7 @@ public class TortaController {
                         System.err.println("Error al actualizar tamaños: " + e.getMessage());
                     }
 
-                    // Actualizar coberturas desde IDs
+                    // Actualizar coberturas
                     if (coberturasIdsJson != null && !coberturasIdsJson.isEmpty() && !coberturasIdsJson.equals("[]")) {
                         try {
                             List<Long> ids = mapper.readValue(coberturasIdsJson, new TypeReference<List<Long>>() {});
@@ -146,7 +154,7 @@ public class TortaController {
                             System.err.println("Error al actualizar coberturas por ID: " + e.getMessage());
                         }
                     } else {
-                        torta.setCoberturas(new ArrayList<>()); // Si mandan vacío, vaciamos las coberturas
+                        torta.setCoberturas(new ArrayList<>());
                     }
 
                     return tortaRepository.save(torta);
