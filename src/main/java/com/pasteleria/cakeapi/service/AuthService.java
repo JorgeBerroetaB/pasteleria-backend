@@ -17,15 +17,22 @@ public class AuthService {
         this.passwordEncoder = new BCryptPasswordEncoder();
     }
 
-    // Para que TÚ crees empleados con clave encriptada
     public Usuario registrar(Usuario usuario) {
         usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
         return usuarioRepository.save(usuario);
     }
 
-    // Para verificar el login
     public Optional<Usuario> login(String username, String password) {
         return usuarioRepository.findByUsername(username)
                 .filter(u -> passwordEncoder.matches(password, u.getPassword()));
+    }
+
+    // --- NUEVO MÉTODO PARA CAMBIAR CONTRASEÑA ---
+    public boolean cambiarPassword(Long usuarioId, String nuevaPassword) {
+        return usuarioRepository.findById(usuarioId).map(usuario -> {
+            usuario.setPassword(passwordEncoder.encode(nuevaPassword));
+            usuarioRepository.save(usuario);
+            return true;
+        }).orElse(false);
     }
 }
